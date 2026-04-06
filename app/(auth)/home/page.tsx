@@ -686,44 +686,53 @@ export default function Home() {
                   <article key={topic.id} className={`
                     bg-white rounded-2xl p-6 shadow-sm border transition flex flex-col relative h-full
                     ${isArchiveMode 
-                      ? 'border-gray-300 bg-gray-50/50 sepia-[0.1]' // アーカイブ時：少し落ち着いた色
-                      : 'border-gray-200 hover:shadow-md'          // 通常時
+                      ? 'border-gray-300 bg-gray-50/50 sepia-[0.1]' 
+                      : 'border-gray-200 hover:shadow-md'          
                     }
                   `}>
-                    {/* ヘッダー全体 */}
-                    <div className="flex items-start mb-4 w-full">
+                    <div className="flex items-start justify-between mb-4 w-full gap-3">
                       
-                      {/* 左側コンテナ：バッジとタイトル */}
-                      <div className="flex flex-col gap-1.5 max-w-[85%]">
-                        <div className="flex gap-3 items-start">
-                          {/* GENバッジ */}
-                          <div className="flex items-center bg-emerald-50 rounded-lg shadow-sm border border-emerald-100 overflow-hidden flex-shrink-0 mt-0.5">
+                      <div className="flex flex-col gap-2.5 flex-grow">
+                        
+                        {/* 上段：GENバッジと残り時間 */}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center bg-emerald-50 rounded-lg shadow-sm border border-emerald-100 overflow-hidden flex-shrink-0">
                             <button onClick={() => handleNavigateGen(index, topic, 'prev')} disabled={topic.version <= 1} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">◀</button>
                             <span className="px-2 py-1.5 text-[10px] font-black text-emerald-800 uppercase border-x border-emerald-100 bg-emerald-100">GEN {topic.version}</span>
                             <button onClick={() => handleNavigateGen(index, topic, 'next')} disabled={topic.is_current} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">▶</button>
                           </div>
                           
-                          {/* 💡 タイトル */}
-                          <div className="bg-gray-100 px-4 py-2.5 rounded-2xl inline-block">
-                            <p className="text-[12px] font-bold text-gray-700 leading-relaxed break-words line-clamp-1">
-                              {topic.genre}
-                            </p>
-                          </div>
+                          <p className={`text-[9px] font-bold flex items-center gap-1 ${
+                            isArchiveMode ? 'text-gray-400' : (msLeft < 1000 * 60 * 60 * 24 ? 'text-red-500 animate-pulse' : 'text-amber-600')
+                          }`}>
+                            {isArchiveMode ? '📚 アーカイブ' : `⌛ ${timeLeftText}`}
+                          </p>
                         </div>
+
+                        {/* 中段：タグ（グレーでスッキリ） */}
+                        {topic.search_tags && topic.search_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {topic.search_tags.map((tag: string, i: number) => (
+                              <span 
+                                key={i} 
+                                className="bg-gray-100 text-gray-500 text-[9px] font-bold px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-tighter"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         
-                        {/* 残り時間 */}
-                        <p className={`text-[9px] font-bold flex items-center gap-1 ${
-                          isArchiveMode ? 'text-gray-400' : (msLeft < 1000 * 60 * 60 * 24 ? 'text-red-500 animate-pulse' : 'text-amber-600')
-                        }`}>
-                          {isArchiveMode ? '📚 知識の書庫に収蔵済み' : `⌛ ${timeLeftText}`}
-                        </p>
+                        {/* 下段：タイトル（背景をなくし、左にアクセントライン） */}
+                        <div className="w-fit mt-1 pl-3 border-l-4 border-emerald-500">
+                          <p className="text-sm md:text-base font-black text-gray-900 leading-relaxed break-words line-clamp-1">
+                            {topic.genre}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* 💡 魔法のスペーサー：これが余白をすべて吸収して右端へ押し出す */}
-                      <div className="flex-grow"></div>
-
                       {/* 右端：シェアボタン */}
-                      <div className="flex-shrink-0 ml-2">
+                      <div className="flex-shrink-0 ml-2 mt-1">
                         <button 
                           onClick={() => handleShare(topic)}
                           className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
@@ -736,84 +745,29 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* 💡 コンテンツエリア全体を flex-grow flex flex-col にして、要素を縦に広げる */}
                     <div className="space-y-4 flex-grow flex flex-col">
                       
-                      {/* AIが生成したタグの表示 */}
-                      {topic.search_tags && topic.search_tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {topic.search_tags.map((tag: string, i: number) => (
-                            <span 
-                              key={i} 
-                              className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-2 py-0.5 rounded-md border border-emerald-100 uppercase tracking-tighter"
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* AI原案 */}
-                      <div className="text-sm">
-                        <p className="text-gray-400 font-bold mb-1 text-[10px] uppercase tracking-tighter flex items-center gap-1">
-                          <span>⚠️</span> AI原案 
+                      {/* 💡 変更：AI原案を「付箋風」にしてドラフト感を演出 */}
+                      <div className={`p-4 rounded-xl border ${isArchiveMode ? 'bg-gray-100 border-gray-200' : 'bg-amber-50/50 border-amber-100/50'}`}>
+                        <p className="text-gray-400 font-bold mb-1.5 text-[10px] uppercase tracking-tighter flex items-center gap-1">
+                          <span>🤖</span> AI原案 
                           {topic.focus_point && (
-                            <span className="text-amber-600 ml-1">
-                              / 「<span className="font-black underline decoration-amber-200 underline-offset-2">{topic.focus_point}</span>」に注目
+                            <span className="text-gray-500 ml-1">
+                              / 「<span className="font-black underline decoration-gray-300 underline-offset-2">{topic.focus_point}</span>」に注目
                             </span>
                           )}
                         </p>
-                        {/* 💡 修正：line-clamp-3 を適用して、長文でも3行で「...」と省略する */}
-                        <p className="leading-relaxed text-sm text-gray-800 font-medium line-clamp-3">
+                        <p className="leading-relaxed text-base text-gray-800 font-medium line-clamp-3">
                           {topic.ai_text}
                         </p>
                       </div>
 
-                      {/* 💡 修正：保護期間中はボタンを無効化し、メッセージを表示 */}
-                      {canInteract && (
-                        <div className="py-2 border-y border-gray-50 border-dashed space-y-1.5">
-                          {isProtected && (
-                            <p className="text-[9px] font-bold text-amber-600 text-center bg-amber-50 rounded py-0.5 border border-amber-100">
-                              ⏳ 投稿から3日間は期間操作できません
-                            </p>
-                          )}
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => handleTimeControl(topic.id, 'EXTEND')} 
-                              disabled={isProtected}
-                              className={`flex-1 text-[9px] py-2 rounded-lg font-bold transition shadow-sm ${
-                                isProtected 
-                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                                  : myControl?.action_type === 'EXTEND' 
-                                    ? 'bg-blue-600 text-white' 
-                                    : 'bg-blue-50 text-blue-600'
-                              }`}
-                            >
-                              🛡️ 延長
-                            </button>
-                            <button 
-                              onClick={() => handleTimeControl(topic.id, 'HASTEN')} 
-                              disabled={isProtected}
-                              className={`flex-1 text-[9px] py-2 rounded-lg font-bold transition shadow-sm ${
-                                isProtected 
-                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
-                                  : myControl?.action_type === 'HASTEN' 
-                                    ? 'bg-orange-600 text-white' 
-                                    : 'bg-orange-50 text-orange-600'
-                              }`}
-                            >
-                              🔄 更新
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 💡 修正：ベストアンサー枠。mt-auto で下部に押し付け、高さを固定化 */}
+                      {/* ベストアンサー枠 */}
                       <div className="mt-auto pt-2">
                         {best ? (
-                          <div className={`p-4 rounded-xl border text-sm flex flex-col h-[96px] ${isPastGen ? 'bg-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                            {/* 💡 修正：line-clamp-2 を適用 */}
-                            <p className="text-gray-900 font-medium leading-relaxed text-xs line-clamp-2 flex-grow">
+                          <div className={`p-4 rounded-xl border flex flex-col h-[96px] ${isPastGen ? 'bg-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                            {/* 💡 変更：人間の回答を text-sm にし、font-bold で力強く */}
+                            <p className="text-gray-900 font-bold leading-relaxed text-sm line-clamp-2 flex-grow">
                               {best.correction_text}
                             </p>
                             <div className="flex items-center gap-3 mt-1">
@@ -832,8 +786,9 @@ export default function Home() {
                             </div>
                           </div>
                         ) : (
-                          <div className="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-200 text-center text-xs text-gray-400 font-medium h-[96px] flex items-center justify-center">
-                            検証待ち
+                          <div className="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-200 text-center flex flex-col justify-center h-[96px]">
+                            {/* 💡 変更：検証待ちも少しメリハリをつける */}
+                            <p className="text-[11px] text-gray-400 font-bold">検証待ち</p>
                           </div>
                         )}
                       </div>
