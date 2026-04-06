@@ -104,8 +104,9 @@ export default function Home() {
     if (trimmedSearch !== '') {
       const words = trimmedSearch.split(/[\s　]+/);
       words.forEach(word => {
+        // search_tags.cs.{word} を追加することで、タグの中に完全一致する単語があるか探します
         query = query.or(
-          `genre.ilike.%${word}%,ai_text.ilike.%${word}%,focus_point.ilike.%${word}%`
+          `genre.ilike.%${word}%,ai_text.ilike.%${word}%,focus_point.ilike.%${word}%,search_tags.cs.{${word}}`
         );
       });
     }
