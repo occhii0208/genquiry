@@ -46,6 +46,7 @@ export async function proxy(request: NextRequest) {
 
   // 💡 公開ページ（未ログインでも見れる場所）を定義
   const isPublicPage = 
+    pathname.startsWith('/api/') ||
     pathname === '/home' || // 🏠 メイン画面をここに追加！
     pathname.startsWith('/topic/local/') || 
     pathname === '/leaderboard' ||
