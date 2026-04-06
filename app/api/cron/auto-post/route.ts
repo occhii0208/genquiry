@@ -38,12 +38,14 @@ export async function GET(request: Request) {
     const generatedGenre = geminiResult.candidates[0].content.parts[0].text.trim();
     console.log("自動生成されたお題:", generatedGenre);
 
-    // ==========================================
-    // ② 既存のアプリの機能（/api/generate）にお題を投げて下書きを作らせる
-    // ==========================================
-    const generateResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/generate`, {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+    const generateResponse = await fetch(`${baseUrl}/api/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        // 💡 追加：AI生成APIを叩くときに合言葉を提示する
+        'Authorization': `Bearer ${process.env.CRON_SECRET}` 
+      },
       body: JSON.stringify({ genre: generatedGenre }) 
     });
 

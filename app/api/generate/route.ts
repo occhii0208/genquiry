@@ -6,6 +6,9 @@ import { NextResponse } from "next/server";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
+
+  const authHeader = req.headers.get('authorization');
+  const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const cookieStore = await cookies()
 
   // 1. サーバー側で認証用クライアントを作成
@@ -24,7 +27,8 @@ export async function POST(req: Request) {
   // 2. 【重要】ユーザーがログインしているか確認
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  if (authError || !user) {
+  // 💡 修正：一般ユーザーが未ログインなら弾くが、Cron（isCronがtrue）なら特別に通す！
+  if (!isCron && (authError || !user)) {
     return NextResponse.json(
       { error: "認証が必要です。ログインしてから投稿してください。" }, 
       { status: 401 }
