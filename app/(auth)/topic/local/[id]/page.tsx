@@ -486,7 +486,7 @@ export default function TopicDetail() {
                       onClick={() => setCorrectionInput(topic.ai_text)}
                       className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5"
                     >
-                      <span>🤖</span> AIの草稿を引用して手直しする
+                      AIの草稿をセットする
                     </button>
                   </div>
                   <div className="relative">
