@@ -19,6 +19,7 @@ export default function Home() {
   const [isArchiveMode, setIsArchiveMode] = useState(false);
 
   const [genre, setGenre] = useState('');
+  const [confirmedGenre, setConfirmedGenre] = useState('');
   const [aiText, setAiText] = useState('「AIに下書きを作成させる」を押すと、ここに草稿が表示されます。');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
@@ -225,6 +226,7 @@ export default function Home() {
       }
   
       // 成功時
+      setConfirmedGenre(genre);
       setAiText(data.ai_text);
       setExtractedData(data);
   
@@ -306,7 +308,7 @@ export default function Home() {
       const { error } = await supabase
       .from('topics')
       .insert([{ 
-        genre, 
+        genre: confirmedGenre,
         ai_text: finalAiText, 
         user_id: user.id,
         search_tags: extractedData.search_tags,
@@ -503,7 +505,11 @@ export default function Home() {
       <header className="flex justify-between items-center mb-8 border-b border-gray-200 pb-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-            Genquiry <span className="text-emerald-600 font-medium text-xl">Beta</span>
+          Genquiry
+          {/* 💡 BetaからLocalへ変更：背景色と丸みをつけてバッジ風に */}
+          <span className="bg-emerald-600 text-white text-sm font-bold px-2 py-0.5 rounded-md tracking-normal">
+            Local
+          </span>
           </h1>
           <p className="text-gray-500 text-xs font-medium mt-1">質問箱形式で育つ新たな知識プラットフォーム</p>
         </div>
