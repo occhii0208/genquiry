@@ -939,7 +939,7 @@ export default function Home() {
           <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl space-y-6">
             <h2 className="text-xl font-bold text-gray-900">地元民として訂正案を出す</h2>
 
-            <div className="flex justify-end mb-[-12px]">
+            <div className="flex justify-end mb-2">
               <button 
                 onClick={() => {
                   // 現在編集しようとしているトピックのデータを取得
