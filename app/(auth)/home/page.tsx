@@ -938,6 +938,22 @@ export default function Home() {
         <div className="fixed inset-0 bg-gray-900/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl space-y-6">
             <h2 className="text-xl font-bold text-gray-900">地元民として訂正案を出す</h2>
+
+            <div className="flex justify-end mb-[-12px]">
+              <button 
+                onClick={() => {
+                  // 現在編集しようとしているトピックのデータを取得
+                  const targetTopic = topics.find(t => t.id === editingTopicId);
+                  if (targetTopic) {
+                    setCorrectionText(targetTopic.ai_text); // AIのテキストをセット
+                  }
+                }}
+                className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5"
+              >
+                AIの草稿をセットする
+              </button>
+            </div>
+
             <textarea 
               maxLength={1000} // 💡 1000文字制限を追加
               className="w-full h-40 p-4 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-100" 
