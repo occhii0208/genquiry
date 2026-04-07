@@ -18,6 +18,8 @@ export default function ProfilePage() {
 
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
+
+  const [avatarSeed, setAvatarSeed] = useState('');
   
   const [totalLikes, setTotalLikes] = useState(0);
   const [trustScore, setTrustScore] = useState(0);
@@ -61,6 +63,7 @@ export default function ProfilePage() {
         setBio(profileData.bio || '');
         setTotalLikes(profileData.total_likes_received || 0);
         setTrustScore(profileData.trust_score ?? 0);
+        setAvatarSeed(profileData.avatar_seed || id);
       }
 
       // 💡 修正：自分のプロフィールの時だけ、履歴の1ページ目（0番）を取得する
@@ -74,6 +77,11 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRandomizeAvatar = () => {
+    const newSeed = Math.random().toString(36).substring(7);
+    setAvatarSeed(newSeed);
   };
 
   // 💡 追加：お題を10件ずつ取得する関数
@@ -127,6 +135,7 @@ export default function ProfilePage() {
         id: user.id,
         username,
         bio,
+        avatar_seed: avatarSeed,
         updated_at: new Date().toISOString(),
       };
 
@@ -175,8 +184,28 @@ export default function ProfilePage() {
 
           <div className="px-8 pb-8">
             <div className="relative -mt-16 mb-8 flex justify-between items-end">
-              <div className="w-32 h-32 bg-white rounded-full p-2 shadow-md">
-                <img src={avatarUrl} alt="Avatar" className="w-full h-full rounded-full bg-emerald-50" />
+              <div className="relative group"> {/* 💡 relativeに変更 */}
+                <div className="w-32 h-32 bg-white rounded-full p-2 shadow-md">
+                  {/* 💡 修正：avatarSeed を使って画像を表示 */}
+                  <img 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} 
+                    alt="Avatar" 
+                    className="w-full h-full rounded-full bg-emerald-50" 
+                  />
+                </div>
+                
+                {/* 💡 追加：編集モードの時だけ表示されるシャッフルボタン */}
+                {isEditing && (
+                  <button
+                    onClick={handleRandomizeAvatar}
+                    className="absolute bottom-0 right-0 bg-emerald-600 text-white p-2 rounded-full shadow-lg hover:bg-emerald-700 transition transform hover:scale-110 border-2 border-white"
+                    title="アイコンをシャッフル"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  </button>
+                )}
               </div>
               
               {isOwnProfile && !isEditing && (
@@ -258,7 +287,11 @@ export default function ProfilePage() {
 
                 <div className="flex gap-3 pt-6">
                   <button 
-                    onClick={() => setIsEditing(false)}
+                    // 💡 修正：ただ画面を戻すだけでなく、元のデータをDBから再取得してリセットする
+                    onClick={async () => {
+                      setIsEditing(false);
+                      await getInitialData(); // ← これを追加！
+                    }}
                     className="flex-1 bg-gray-100 text-gray-600 font-bold py-4 rounded-xl hover:bg-gray-200 transition"
                   >
                     キャンセル
