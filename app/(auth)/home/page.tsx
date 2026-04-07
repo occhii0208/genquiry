@@ -51,16 +51,16 @@ export default function Home() {
       // 1. ユーザー情報を取得
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setSession({ user });
-        // 💡 追加：プロフィールテーブルから avatar_seed を取得
+        // 💡 修正：sessionをセットする前に、先にDBから avatar_seed を取得する
         const { data: profile } = await supabase
           .from('profiles')
           .select('avatar_seed')
           .eq('id', user.id)
           .single();
         
-        // シード値があればそれをご使い、無ければユーザーIDを初期値にする
+        // 💡 取得し終わってから、アバターとセッションを「同時に」セットする
         setAvatarSeed(profile?.avatar_seed || user.id);
+        setSession({ user });
       } else {
         setSession(null);
       }
@@ -260,7 +260,7 @@ export default function Home() {
   const handleSaveDraft = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return toast.error('投稿にはログインが必要です');
-    if (!genre || !extractedData) return;
+    if (!confirmedGenre || !extractedData) return;
   
     // 💡 1. 【赤】かなり似ている（タグ2つ以上 ＋ 核心も一致）を探す
     const strongMatch = duplicateTopics.find(t => {
@@ -912,7 +912,7 @@ export default function Home() {
                 <div className="p-8 bg-gray-50">
                   <button 
                     onClick={handleSaveDraft} 
-                    disabled={isSubmittingDraft || isGenerating || !extractedData} 
+                    disabled={isSubmittingDraft || isGenerating || !confirmedGenre || !extractedData} 
                     className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-sm disabled:bg-gray-300 transition"
                   >
                     {isSubmittingDraft ? "保存中..." : "検証待ち記事として投稿する"}
