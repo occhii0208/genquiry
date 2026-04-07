@@ -250,6 +250,38 @@ export default function TopicDetail() {
     }
   };
 
+  // 💡 追加：前後の世代のページへ遷移する機能
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const handleNavigateGen = async (direction: 'prev' | 'next') => {
+    setIsNavigating(true);
+    try {
+      if (direction === 'prev') {
+        if (!topic.parent_id) return;
+        // 前の世代のページへ移動
+        router.push(`/topic/local/${topic.parent_id}`);
+      } else {
+        // 次の世代は parent_id が「今のID」になっているものを探す
+        const { data, error } = await supabase
+          .from('topics')
+          .select('id')
+          .eq('parent_id', topic.id)
+          .single();
+
+        if (error || !data) {
+          alert('次の世代が見つかりませんでした。');
+          return;
+        }
+        // 次の世代のページへ移動
+        router.push(`/topic/local/${data.id}`);
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
+    } finally {
+      setIsNavigating(false);
+    }
+  };
+
   if (loading && !topic) return <div className="p-12 text-center text-gray-400 font-bold animate-pulse">データを読み込み中...</div>;
   if (!topic) return <div className="p-12 text-center text-gray-400">記事が見つかりませんでした。</div>;
 
@@ -303,15 +335,46 @@ export default function TopicDetail() {
             
             <div className="flex items-start w-full mb-8">
               <div className="flex flex-col gap-3 max-w-[85%]">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border ${isPastGen ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
-                    GEN {topic.version}
-                  </span>
+              <div className="flex items-center gap-3 flex-wrap">
+                  {/* 💡 変更：静的なspanを、クリックできるナビゲーションボタンに変更 */}
+                  <div className={`flex items-center rounded-lg shadow-sm border overflow-hidden flex-shrink-0 ${isPastGen ? 'bg-gray-100 border-gray-200' : 'bg-emerald-50 border-emerald-100'}`}>
+                    <button 
+                      onClick={() => handleNavigateGen('prev')} 
+                      disabled={topic.version <= 1 || isNavigating} 
+                      className={`px-3 py-1.5 text-[10px] font-black transition disabled:opacity-30 disabled:cursor-not-allowed ${isPastGen ? 'text-gray-500 hover:bg-gray-200' : 'text-emerald-700 hover:bg-emerald-200'}`}
+                    >
+                      ◀
+                    </button>
+                    <span className={`px-3 py-1.5 text-[10px] font-black uppercase border-x tracking-widest ${isPastGen ? 'border-gray-200 text-gray-600 bg-gray-200/50' : 'border-emerald-100 text-emerald-800 bg-emerald-100'}`}>
+                      GEN {topic.version}
+                    </span>
+                    <button 
+                      onClick={() => handleNavigateGen('next')} 
+                      disabled={topic.is_current || isNavigating} 
+                      className={`px-3 py-1.5 text-[10px] font-black transition disabled:opacity-30 disabled:cursor-not-allowed ${isPastGen ? 'text-gray-500 hover:bg-gray-200' : 'text-emerald-700 hover:bg-emerald-200'}`}
+                    >
+                      ▶
+                    </button>
+                  </div>
                   
                   <span className={`text-[10px] font-bold flex items-center gap-1 ${canInteract && msLeft < 1000 * 60 * 60 * 24 ? 'text-red-500 animate-pulse' : isPastGen ? 'text-gray-400' : 'text-amber-600'}`}>
                     ⌛ {timeLeftText}
                   </span>
                 </div>
+
+                {/* 💡 追加：タイトルの上にタグを表示（トップページと同じスッキリしたグレー） */}
+                {topic.search_tags && topic.search_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {topic.search_tags.map((tag: string, i: number) => (
+                      <span 
+                        key={i} 
+                        className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2.5 py-1 rounded-md border border-gray-200 uppercase tracking-tighter"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 
                 <h1 className="text-2xl font-black text-gray-900 leading-relaxed">
                   {topic.genre}
@@ -334,12 +397,19 @@ export default function TopicDetail() {
             </div>
 
             <div className="border-t border-gray-100 pt-6">
-              <h2 className="text-xs font-bold mb-3 text-gray-400 flex items-center gap-1.5 uppercase tracking-wider">
-                AIによる元の草稿
-              </h2>
-              <p className="text-gray-800 font-medium leading-relaxed bg-gray-50 p-6 rounded-2xl text-base border border-gray-100">
-                {topic.ai_text}
-              </p>
+              <div className={`p-6 rounded-2xl border ${isPastGen ? 'bg-gray-100 border-gray-200' : 'bg-amber-50/50 border-amber-100/50'}`}>
+                <h2 className="text-xs font-bold mb-3 text-gray-500 flex items-center gap-1.5 uppercase tracking-wider">
+                  <span>🤖</span> AIによる元の草稿
+                  {topic.focus_point && (
+                    <span className="text-gray-500 ml-1 normal-case text-[10px]">
+                      / 「<span className="font-black underline decoration-gray-300 underline-offset-2">{topic.focus_point}</span>」に注目
+                    </span>
+                  )}
+                </h2>
+                <p className="text-gray-800 font-medium leading-relaxed text-base">
+                  {topic.ai_text}
+                </p>
+              </div>
 
               {/* 💡 ここから追加：期間操作ボタンエリア */}
               {canInteract && (
@@ -349,8 +419,9 @@ export default function TopicDetail() {
                   </h3>
                   
                   {isProtected && (
-                    <p className="text-[10px] font-bold text-amber-600 text-center bg-amber-50 rounded py-1.5 border border-amber-100 mb-3 mx-auto max-w-sm">
-                      ⏳ 投稿から3日間は期間操作できません
+                    /* 💡 変更：付箋の黄色と被らないよう、色をスレート（青灰色）にし、アイコンをロック(🔒)に変更 */
+                    <p className="text-[10px] font-bold text-slate-600 text-center bg-slate-100 rounded py-1.5 border border-slate-200 mb-3 mx-auto max-w-sm">
+                      🔒 投稿から3日間は期間操作できません
                     </p>
                   )}
                   
