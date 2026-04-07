@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 export default function AdminPage() {
   // 💡 修正：レポートをそのまま配列で持つのではなく、correction_id をキーにしてグループ化する
@@ -87,7 +88,7 @@ export default function AdminPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'エラーが発生しました');
       
-      alert(result.message);
+      toast.success(result.message);
       
       // 💡 承認した場合は、同じ投稿に対する他の通報も画面から消す
       setGroupedReports(prev => {
@@ -102,7 +103,7 @@ export default function AdminPage() {
         return next;
       });
     } catch (error: any) {
-      alert("エラー: " + error.message);
+      toast.error("エラー: " + error.message);
       fetchReports(); // エラーが起きたら最新状態にリロード
     }
   };

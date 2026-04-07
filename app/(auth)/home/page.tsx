@@ -6,6 +6,7 @@ import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
 import { TrophyIcon } from '@heroicons/react/24/solid';
 import Footer from '@/components/Footer';
+import toast from 'react-hot-toast';
 
 export default function Home() {
 
@@ -193,7 +194,7 @@ export default function Home() {
       if (!res.ok) {
         // サーバーが返した error または message を表示し、aiTextを戻す
         const errorMessage = data.error || data.message || "生成に失敗しました";
-        alert(errorMessage);
+        toast.error(errorMessage);
         setAiText("「AIに下書きを作成させる」を押すと、ここに草稿が表示されます。");
         setIsGenerating(false);
         return;
@@ -201,7 +202,7 @@ export default function Home() {
   
       // AIの判定ロジック（is_valid: false）の場合
       if (!data.is_valid) {
-        alert(`投稿できません: ${data.reason}`);
+        toast.error(`投稿できません: ${data.reason}`);
         setAiText("地域に関係のない内容は投稿できません。");
         setIsGenerating(false);
         return;
@@ -231,7 +232,7 @@ export default function Home() {
   
     } catch (e: any) {
       // 💡 修正ポイント：ネットワーク遮断などの致命的なエラー時
-      alert("通信エラーが発生しました。ログイン状態を確認してください。");
+      toast.error("通信エラーが発生しました。ログイン状態を確認してください。");
       setAiText("エラーにより生成に失敗しました。");
     } finally {
       setIsGenerating(false);
@@ -240,7 +241,7 @@ export default function Home() {
 
   const handleSaveDraft = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('投稿にはログインが必要です');
+    if (!user) return toast.error('投稿にはログインが必要です');
     if (!genre || !extractedData) return;
   
     // 💡 1. 【赤】かなり似ている（タグ2つ以上 ＋ 核心も一致）を探す
@@ -251,14 +252,18 @@ export default function Home() {
   
     // 💡 赤の対応：差別化入力必須
     if (strongMatch && !showDiffInput) {
-      alert(`「${strongMatch.genre}」ですでに「${strongMatch.focus_point}」の視点で似た投稿があります。\n\n既存のお題と何が決定的に違うのかを入力してください。`);
+      toast(`「${strongMatch.genre}」ですでに「${strongMatch.focus_point}」の視点で似た投稿があります。\n\n既存のお題と何が決定的に違うのかを入力してください。`, {
+        icon: 'ℹ️',
+      });
       setShowDiffInput(true);
       return;
     }
   
     // 💡 差別化入力のバリデーション
     if (showDiffInput && diffPoint.trim().length < 10) {
-      return alert("既存のお題との違いを、10文字以上で入力してください。");
+      return toast("既存のお題との違いを、10文字以上で入力してください。", {
+        icon: 'ℹ️',
+      });
     }
   
     // 💡 2. 【黄】緩い重複の確認（強烈な一致はないが、タグ2つ以上一致がある場合）
@@ -290,7 +295,7 @@ export default function Home() {
       }]);
   
     if (!error) {
-      alert('投稿しました！');
+      toast.success('投稿しました！');
       setGenre('');
       setAiText('「AIに下書きを作成させる」を押すと、ここに草稿が表示されます。');
       setExtractedData(null);

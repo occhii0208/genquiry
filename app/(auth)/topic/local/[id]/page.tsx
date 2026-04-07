@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
+import toast from 'react-hot-toast';
 
 export default function TopicDetail() {
   const { id } = useParams();
@@ -75,8 +76,8 @@ export default function TopicDetail() {
   // 💡 追加：訂正案を送信する関数
   const handleSubmitCorrection = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('投稿するにはログインが必要です');
-    if (!correctionInput.trim()) return alert('訂正内容を入力してください');
+    if (!user) return toast.error('投稿するにはログインが必要です');
+    if (!correctionInput.trim()) return toast.error('訂正内容を入力してください');
 
     setIsSubmitting(true);
     try {
@@ -93,7 +94,7 @@ export default function TopicDetail() {
       await fetchTopicData();
       
     } catch (error: any) {
-      alert('投稿エラー: ' + error.message);
+      toast.error('投稿エラー: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -110,15 +111,15 @@ export default function TopicDetail() {
       const { error } = await supabase.from('corrections').delete().eq('id', correctionId);
       if (error) throw error;
     } catch (error: any) {
-      alert('削除中にエラーが発生しました: ' + error.message);
+      toast.error('削除中にエラーが発生しました: ' + error.message);
       fetchTopicData();
     }
   };
 
   const handleReport = async (correctionId: string, targetUserId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('通報するにはログインが必要です');
-    if (user.id === targetUserId) return alert('自分の投稿は通報できません');
+    if (!user) return toast.error('通報するにはログインが必要です');
+    if (user.id === targetUserId) return toast.error('自分の投稿は通報できません');
 
     const reason = window.prompt('通報の理由を入力してください\n（例：スパム、不適切な言葉、虚偽の情報）');
     if (!reason) return;
@@ -131,15 +132,15 @@ export default function TopicDetail() {
     }]);
 
     if (!error) {
-      alert('通報を受理しました。運営が確認いたします。');
+      toast.success('通報を受理しました。運営が確認いたします。');
     } else {
-      alert('エラーが発生しました: ' + error.message);
+      toast.error('エラーが発生しました: ' + error.message);
     }
   };
 
   const handleLike = async (correctionId: string, targetUserId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('ログインが必要です');
+    if (!user) return toast.error('ログインが必要です');
     const myId = user.id;
 
     const updated = allCorrections.map(cor => {
@@ -195,7 +196,7 @@ export default function TopicDetail() {
   // 💡 handleSubmitCorrection の下あたりに追加
   const handleTimeControl = async (action: 'EXTEND' | 'HASTEN') => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('ログインが必要です');
+    if (!user) return toast.error('ログインが必要です');
     const myId = user.id;
 
     // 1. 楽観的UI更新 (画面だけ先に変える)
@@ -245,7 +246,7 @@ export default function TopicDetail() {
         await supabase.from('topic_time_controls').insert([{ topic_id: topic.id, user_id: myId, action_type: action }]);
       }
     } catch (err: any) {
-      alert('エラーが発生しました: ' + err.message);
+      toast.error('エラーが発生しました: ' + err.message);
       fetchTopicData(); // エラー時は元に戻す
     }
   };
@@ -269,7 +270,7 @@ export default function TopicDetail() {
           .single();
 
         if (error || !data) {
-          alert('次の世代が見つかりませんでした。');
+          toast.error('次の世代が見つかりませんでした。');
           return;
         }
         // 次の世代のページへ移動
