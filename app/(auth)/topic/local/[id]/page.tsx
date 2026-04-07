@@ -480,6 +480,15 @@ export default function TopicDetail() {
               </h3>
               {session?.user ? (
                 <>
+                  {/* 💡 追加：AI草稿の引用ボタン */}
+                  <div className="flex justify-end mb-2">
+                    <button 
+                      onClick={() => setCorrectionInput(topic.ai_text)}
+                      className="text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1.5"
+                    >
+                      <span>🤖</span> AIの草稿を引用して手直しする
+                    </button>
+                  </div>
                   <div className="relative">
                     <textarea
                       // 💡 修正：maxLength属性でシステム的にも1000文字でブロック
