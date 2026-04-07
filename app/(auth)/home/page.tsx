@@ -14,6 +14,8 @@ export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'search' | 'create'>('search');
 
+  const [avatarSeed, setAvatarSeed] = useState<string>('');
+
   const [isArchiveMode, setIsArchiveMode] = useState(false);
 
   const [genre, setGenre] = useState('');
@@ -47,7 +49,20 @@ export default function Home() {
     const checkUser = async () => {
       // 1. ユーザー情報を取得
       const { data: { user } } = await supabase.auth.getUser();
-      setSession(user ? { user } : null);
+      if (user) {
+        setSession({ user });
+        // 💡 追加：プロフィールテーブルから avatar_seed を取得
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_seed')
+          .eq('id', user.id)
+          .single();
+        
+        // シード値があればそれをご使い、無ければユーザーIDを初期値にする
+        setAvatarSeed(profile?.avatar_seed || user.id);
+      } else {
+        setSession(null);
+      }
     };
 
     // 💡 トレンドを取得する関数を追加
@@ -169,6 +184,7 @@ export default function Home() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittedQuery(searchQuery);
+    setTopics([]);
     fetchTopics(0, true);
   };
 
@@ -340,38 +356,6 @@ export default function Home() {
     setIsSubmittingCorrection(false);
   };
 
-  const handleDeleteCorrection = async (correctionId: string) => {
-    if (!window.confirm('本当にこの投稿を削除しますか？')) return;
-    setIsSearching(true);
-    try {
-      await supabase.from('likes').delete().eq('correction_id', correctionId);
-      await supabase.from('reports').delete().eq('correction_id', correctionId);
-      const { error } = await supabase.from('corrections').delete().eq('id', correctionId);
-      if (error) throw error;
-      toast.success('投稿を削除しました。');
-      fetchTopics(0, true);
-    } catch (error: any) {
-      toast.error('削除エラー: ' + error.message);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleDeleteTopic = async (topicId: string) => {
-    if (!window.confirm('このお題を削除しますか？')) return;
-    setIsSearching(true);
-    try {
-      const { error } = await supabase.from('topics').delete().eq('id', topicId);
-      if (error) throw error;
-      toast.success('お題を削除しました。');
-      fetchTopics(0, true);
-    } catch (error: any) {
-      toast.error('削除エラー: ' + error.message);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
   // 💡 修正：引数に targetUserId と topicId を追加
   const handleLike = async (correctionId: string, targetUserId: string, topicId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -541,7 +525,8 @@ export default function Home() {
             {/* 👤 アバター */}
             <Link href={`/profile/${session.user.id}`} className="w-10 h-10 rounded-full border border-gray-200 shadow-sm overflow-hidden flex-shrink-0">
                 <img 
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${session.user.id}`} 
+                  // 💡 修正：session.user.id から avatarSeed に変更
+                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} 
                   alt="Profile" 
                   className="w-full h-full bg-emerald-50" 
                 />
@@ -617,179 +602,208 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {topics.map((topic, index) => {
-                const best = topic.bestCorrection;
-                const correctionCount = topic.corrections?.length || 0;
-                const isPastGen = !topic.is_current;
-                const msLeft = new Date(topic.expires_at).getTime() - new Date().getTime();
-                const isExpired = msLeft <= 0;
-                const canInteract = topic.is_current && !isExpired;
-                const needsGeneration = topic.is_current && isExpired;
-                let timeLeftText = isPastGen ? 'アーカイブ' : isExpired ? '期限切れ' : msLeft < 1000 * 60 * 60 * 24 ? `残り: ${Math.floor(msLeft / (1000 * 60 * 60))} 時間` : `残り: ${Math.floor(msLeft / (1000 * 60 * 60 * 24))} 日`;
-                const myControl = topic.topic_time_controls?.find((c: any) => c.user_id === session?.user?.id);
+            {/* 💡 変更：ローディング中、0件、一覧表示 を綺麗に分岐させる */}
+            {isSearching && topics.length === 0 ? (
+              // 🔄 ① 検索中のローディングアニメーション
+              <div className="flex flex-col items-center justify-center py-24 animate-pulse">
+                <div className="w-10 h-10 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+                <p className="text-sm font-bold text-gray-400">
+                  {isArchiveMode ? "アーカイブを読み込み中..." : "記事を探しています..."}
+                </p>
+              </div>
+            ) : !isSearching && topics.length === 0 ? (
+              // 📭 ② 検索結果が0件だった時の表示
+              <div className="text-center py-24 bg-white rounded-3xl border-2 border-dashed border-gray-200">
+                <div className="text-4xl mb-3 opacity-50">🔎</div>
+                <p className="text-sm font-bold text-gray-400">該当する記事が見つかりませんでした。</p>
+                <button 
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSubmittedQuery('');
+                    fetchTopics(0, true, '');
+                  }}
+                  className="mt-4 text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-4 py-2 rounded-lg transition"
+                >
+                  検索条件をクリア
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {topics.map((topic, index) => {
+                    const best = topic.bestCorrection;
+                    const correctionCount = topic.corrections?.length || 0;
+                    const isPastGen = !topic.is_current;
+                    const msLeft = new Date(topic.expires_at).getTime() - new Date().getTime();
+                    const isExpired = msLeft <= 0;
+                    const canInteract = topic.is_current && !isExpired;
+                    const needsGeneration = topic.is_current && isExpired;
+                    let timeLeftText = isPastGen ? 'アーカイブ' : isExpired ? '期限切れ' : msLeft < 1000 * 60 * 60 * 24 ? `残り: ${Math.floor(msLeft / (1000 * 60 * 60))} 時間` : `残り: ${Math.floor(msLeft / (1000 * 60 * 60 * 24))} 日`;
+                    const myControl = topic.topic_time_controls?.find((c: any) => c.user_id === session?.user?.id);
 
-                const isMyCorrection = best && session?.user?.id === best.user_id;
-                const isMyLike = best?.likes?.some((l: any) => l.user_id === session?.user?.id);
+                    const isMyCorrection = best && session?.user?.id === best.user_id;
+                    const isMyLike = best?.likes?.some((l: any) => l.user_id === session?.user?.id);
 
-                const msFromCreation = new Date().getTime() - new Date(topic.created_at).getTime();
-                const isProtected = msFromCreation < 1000 * 60 * 60 * 24 * 3;
+                    const msFromCreation = new Date().getTime() - new Date(topic.created_at).getTime();
+                    const isProtected = msFromCreation < 1000 * 60 * 60 * 24 * 3;
 
-                return (
-                  <article key={topic.id} className={`
-                    bg-white rounded-2xl p-6 shadow-sm border transition flex flex-col relative h-full
-                    ${isArchiveMode 
-                      ? 'border-gray-300 bg-gray-50/50 sepia-[0.1]' 
-                      : 'border-gray-200 hover:shadow-md'          
-                    }
-                  `}>
-                    <div className="flex items-start justify-between mb-4 w-full gap-3">
-                      
-                      <div className="flex flex-col gap-2.5 flex-grow">
-                        
-                        {/* 上段：GENバッジと残り時間 */}
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center bg-emerald-50 rounded-lg shadow-sm border border-emerald-100 overflow-hidden flex-shrink-0">
-                            <button onClick={() => handleNavigateGen(index, topic, 'prev')} disabled={topic.version <= 1} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">◀</button>
-                            <span className="px-2 py-1.5 text-[10px] font-black text-emerald-800 uppercase border-x border-emerald-100 bg-emerald-100">GEN {topic.version}</span>
-                            <button onClick={() => handleNavigateGen(index, topic, 'next')} disabled={topic.is_current} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">▶</button>
-                          </div>
+                    return (
+                      <article key={topic.id} className={`
+                        bg-white rounded-2xl p-6 shadow-sm border transition flex flex-col relative h-full
+                        ${isArchiveMode 
+                          ? 'border-gray-300 bg-gray-50/50 sepia-[0.1]' 
+                          : 'border-gray-200 hover:shadow-md'          
+                        }
+                      `}>
+                        <div className="flex items-start justify-between mb-4 w-full gap-3">
                           
-                          <p className={`text-[9px] font-bold flex items-center gap-1 ${
-                            isArchiveMode ? 'text-gray-400' : (msLeft < 1000 * 60 * 60 * 24 ? 'text-red-500 animate-pulse' : 'text-amber-600')
-                          }`}>
-                            {isArchiveMode ? '📚 アーカイブ' : `⌛ ${timeLeftText}`}
-                          </p>
-                        </div>
+                          <div className="flex flex-col gap-2.5 flex-grow">
+                            
+                            {/* 上段：GENバッジと残り時間 */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center bg-emerald-50 rounded-lg shadow-sm border border-emerald-100 overflow-hidden flex-shrink-0">
+                                <button onClick={() => handleNavigateGen(index, topic, 'prev')} disabled={topic.version <= 1} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">◀</button>
+                                <span className="px-2 py-1.5 text-[10px] font-black text-emerald-800 uppercase border-x border-emerald-100 bg-emerald-100">GEN {topic.version}</span>
+                                <button onClick={() => handleNavigateGen(index, topic, 'next')} disabled={topic.is_current} className="px-2 py-1.5 text-[10px] text-emerald-700 hover:bg-emerald-200 disabled:opacity-30 transition font-black">▶</button>
+                              </div>
+                              
+                              <p className={`text-[9px] font-bold flex items-center gap-1 ${
+                                isArchiveMode ? 'text-gray-400' : (msLeft < 1000 * 60 * 60 * 24 ? 'text-red-500 animate-pulse' : 'text-amber-600')
+                              }`}>
+                                {isArchiveMode ? '📚 アーカイブ' : `⌛ ${timeLeftText}`}
+                              </p>
+                            </div>
 
-                        {/* 中段：タグ（グレーでスッキリ） */}
-                        {topic.search_tags && topic.search_tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1">
-                            {topic.search_tags.map((tag: string, i: number) => (
-                              <span 
-                                key={i} 
-                                className="bg-gray-100 text-gray-500 text-[9px] font-bold px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-tighter"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* 下段：タイトル（背景をなくし、左にアクセントライン） */}
-                        <div className="w-fit mt-1 pl-3 border-l-4 border-emerald-500">
-                          <p className="text-sm md:text-base font-black text-gray-900 leading-relaxed break-words line-clamp-1">
-                            {topic.genre}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* 右端：シェアボタン */}
-                      <div className="flex-shrink-0 ml-2 mt-1">
-                        <button 
-                          onClick={() => handleShare(topic)}
-                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
-                          title="シェアする"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 flex-grow flex flex-col">
-                      
-                      {/* 💡 変更：AI原案を「付箋風」にしてドラフト感を演出 */}
-                      <div className={`p-4 rounded-xl border ${isArchiveMode ? 'bg-gray-100 border-gray-200' : 'bg-amber-50/50 border-amber-100/50'}`}>
-                        <p className="text-gray-400 font-bold mb-1.5 text-[10px] uppercase tracking-tighter flex items-center gap-1">
-                          <span>🤖</span> AI原案 
-                          {topic.focus_point && (
-                            <span className="text-gray-500 ml-1">
-                              / 「<span className="font-black underline decoration-gray-300 underline-offset-2">{topic.focus_point}</span>」に注目
-                            </span>
-                          )}
-                        </p>
-                        <p className="leading-relaxed text-base text-gray-800 font-medium line-clamp-3">
-                          {topic.ai_text}
-                        </p>
-                      </div>
-
-                      {/* ベストアンサー枠 */}
-                      <div className="mt-auto pt-2">
-                        {best ? (
-                          <div className={`p-4 rounded-xl border flex flex-col h-[96px] ${isPastGen ? 'bg-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                            {/* 💡 変更：人間の回答を text-sm にし、font-bold で力強く */}
-                            <p className="text-gray-900 font-bold leading-relaxed text-sm line-clamp-2 flex-grow">
-                              {best.correction_text}
-                            </p>
-                            <div className="flex items-center gap-3 mt-1">
-                              <button 
-                                onClick={() => canInteract && !isMyCorrection && handleLike(best.id, best.user_id, topic.id)}
-                                disabled={!canInteract || isMyCorrection} 
-                                className={`text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow-sm flex items-center gap-1 ${
-                                  (!canInteract || isMyCorrection)
-                                    ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
-                                    : 'bg-white text-gray-700 border border-emerald-100 hover:bg-emerald-50'
-                                }`}
-                              >
-                                <span>{isMyLike ? '✅' : '👍'}</span>
-                                {best.likes?.length || 0}
-                              </button>
+                            {/* 中段：タグ（グレーでスッキリ） */}
+                            {topic.search_tags && topic.search_tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                {topic.search_tags.map((tag: string, i: number) => (
+                                  <span 
+                                    key={i} 
+                                    className="bg-gray-100 text-gray-500 text-[9px] font-bold px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-tighter"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* 下段：タイトル（背景をなくし、左にアクセントライン） */}
+                            <div className="w-fit mt-1 pl-3 border-l-4 border-emerald-500">
+                              <p className="text-sm md:text-base font-black text-gray-900 leading-relaxed break-words line-clamp-1">
+                                {topic.genre}
+                              </p>
                             </div>
                           </div>
-                        ) : (
-                          <div className="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-200 text-center flex flex-col justify-center h-[96px]">
-                            {/* 💡 変更：検証待ちも少しメリハリをつける */}
-                            <p className="text-[11px] text-gray-400 font-bold">検証待ち</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* フッターアクションエリア */}
-                    <div className="mt-6 pt-4 border-t border-gray-100 space-y-2">
-                      <Link href={`/topic/local/${topic.id}`} className={`w-full block text-center text-xs font-bold py-3 rounded-lg border transition ${correctionCount > 1 ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                        {correctionCount > 1 ? `👉 他の訂正（${correctionCount - 1}件）を見る` : '🔍 詳細・全回答を見る'}
-                      </Link>
-
-                      {canInteract && session?.user && (
-                        <button onClick={() => setEditingTopicId(topic.id)} className="w-full text-xs font-bold py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm">
-                          ✏️ 自分の訂正を投稿
-                        </button>
-                      )}
-
-                      {!isArchiveMode ? (
-                        needsGeneration && (
-                          <div className="space-y-2 pt-2">
-                            <p className="text-[10px] text-red-500 font-bold text-center bg-red-50 py-1.5 rounded">
-                              {topic.carry_over_count >= 1 ? '⚠️ 1回引き継ぎ済み。今回十分な検証がない場合、削除されます。' : '⏳ 期限切れ：次世代への更新が必要です'}
-                            </p>
+                          {/* 右端：シェアボタン */}
+                          <div className="flex-shrink-0 ml-2 mt-1">
                             <button 
-                              onClick={() => handleGenerateNextGen(topic.id)}
-                              disabled={topic.is_generating}
-                              className="w-full text-xs font-bold py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm flex justify-center items-center gap-2"
+                              onClick={() => handleShare(topic)}
+                              className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+                              title="シェアする"
                             >
-                              {topic.is_generating ? '🔄 生成中...' : '🌟 次の世代（GEN）に更新する'}
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                              </svg>
                             </button>
                           </div>
-                        )
-                      ) : (
-                        <div className="space-y-3 pt-2">
-                          <button 
-                            onClick={() => handleVoteRevival(topic.id)}
-                            className="w-full text-xs font-black py-4 rounded-xl transition shadow-md flex justify-center items-center gap-2 transform active:scale-95 bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:opacity-90"
-                          >
-                            🔄 ワンクリックでLIVEに復活させる
-                          </button>
                         </div>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-            {hasMore && topics.length > 0 && <div className="mt-12 flex justify-center pb-8"><button onClick={loadMore} className="bg-white border border-gray-200 text-gray-600 font-bold px-12 py-4 rounded-xl shadow-sm">もっと見る</button></div>}
+
+                        <div className="space-y-4 flex-grow flex flex-col">
+                          
+                          {/* 💡 変更：AI原案を「付箋風」にしてドラフト感を演出 */}
+                          <div className={`p-4 rounded-xl border ${isArchiveMode ? 'bg-gray-100 border-gray-200' : 'bg-amber-50/50 border-amber-100/50'}`}>
+                            <p className="text-gray-400 font-bold mb-1.5 text-[10px] uppercase tracking-tighter flex items-center gap-1">
+                              <span>🤖</span> AI原案 
+                              {topic.focus_point && (
+                                <span className="text-gray-500 ml-1">
+                                  / 「<span className="font-black underline decoration-gray-300 underline-offset-2">{topic.focus_point}</span>」に注目
+                                </span>
+                              )}
+                            </p>
+                            <p className="leading-relaxed text-base text-gray-800 font-medium line-clamp-3">
+                              {topic.ai_text}
+                            </p>
+                          </div>
+
+                          {/* ベストアンサー枠 */}
+                          <div className="mt-auto pt-2">
+                            {best ? (
+                              <div className={`p-4 rounded-xl border flex flex-col h-[96px] ${isPastGen ? 'bg-gray-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                                {/* 💡 変更：人間の回答を text-sm にし、font-bold で力強く */}
+                                <p className="text-gray-900 font-bold leading-relaxed text-sm line-clamp-2 flex-grow">
+                                  {best.correction_text}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <button 
+                                    onClick={() => canInteract && !isMyCorrection && handleLike(best.id, best.user_id, topic.id)}
+                                    disabled={!canInteract || isMyCorrection} 
+                                    className={`text-[10px] font-bold px-3 py-1.5 rounded-full transition shadow-sm flex items-center gap-1 ${
+                                      (!canInteract || isMyCorrection)
+                                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
+                                        : 'bg-white text-gray-700 border border-emerald-100 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    <span>{isMyLike ? '✅' : '👍'}</span>
+                                    {best.likes?.length || 0}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-200 text-center flex flex-col justify-center h-[96px]">
+                                {/* 💡 変更：検証待ちも少しメリハリをつける */}
+                                <p className="text-[11px] text-gray-400 font-bold">検証待ち</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* フッターアクションエリア */}
+                        <div className="mt-6 pt-4 border-t border-gray-100 space-y-2">
+                          <Link href={`/topic/local/${topic.id}`} className={`w-full block text-center text-xs font-bold py-3 rounded-lg border transition ${correctionCount > 1 ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                            {correctionCount > 1 ? `👉 他の訂正（${correctionCount - 1}件）を見る` : '🔍 詳細・全回答を見る'}
+                          </Link>
+
+                          {canInteract && session?.user && (
+                            <button onClick={() => setEditingTopicId(topic.id)} className="w-full text-xs font-bold py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm">
+                              ✏️ 自分の訂正を投稿
+                            </button>
+                          )}
+
+                          {!isArchiveMode ? (
+                            needsGeneration && (
+                              <div className="space-y-2 pt-2">
+                                <p className="text-[10px] text-red-500 font-bold text-center bg-red-50 py-1.5 rounded">
+                                  {topic.carry_over_count >= 1 ? '⚠️ 1回引き継ぎ済み。今回十分な検証がない場合、削除されます。' : '⏳ 期限切れ：次世代への更新が必要です'}
+                                </p>
+                                <button 
+                                  onClick={() => handleGenerateNextGen(topic.id)}
+                                  disabled={topic.is_generating}
+                                  className="w-full text-xs font-bold py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-sm flex justify-center items-center gap-2"
+                                >
+                                  {topic.is_generating ? '🔄 生成中...' : '🌟 次の世代（GEN）に更新する'}
+                                </button>
+                              </div>
+                            )
+                          ) : (
+                            <div className="space-y-3 pt-2">
+                              <button 
+                                onClick={() => handleVoteRevival(topic.id)}
+                                className="w-full text-xs font-black py-4 rounded-xl transition shadow-md flex justify-center items-center gap-2 transform active:scale-95 bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:opacity-90"
+                              >
+                                🔄 ワンクリックでLIVEに復活させる
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                {hasMore && topics.length > 0 && <div className="mt-12 flex justify-center pb-8"><button onClick={loadMore} className="bg-white border border-gray-200 text-gray-600 font-bold px-12 py-4 rounded-xl shadow-sm">もっと見る</button></div>}
+              </>
+            )}
           </div>
         )}
 
