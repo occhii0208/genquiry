@@ -128,7 +128,9 @@ export default function ProfilePage() {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || user.id !== id) {
-        alert('セッションが切れました。再度ログインしてください。');
+        toast('セッションが切れました。再度ログインしてください。', {
+          icon: 'ℹ️', // または 💡 など
+        });
         return;
       }
 
@@ -143,10 +145,10 @@ export default function ProfilePage() {
       const { error } = await supabase.from('profiles').upsert(updates);
       if (error) throw error;
 
-      alert('プロフィールを更新しました！');
+      toast.success('プロフィールを更新しました！');
       setIsEditing(false);
     } catch (error: any) {
-      alert('更新エラー: ' + error.message);
+      toast.error('更新エラー: ' + error.message);
     } finally {
       setLoading(false);
     }

@@ -252,9 +252,17 @@ export default function Home() {
   
     // 💡 赤の対応：差別化入力必須
     if (strongMatch && !showDiffInput) {
-      toast(`「${strongMatch.genre}」ですでに「${strongMatch.focus_point}」の視点で似た投稿があります。\n\n既存のお題と何が決定的に違うのかを入力してください。`, {
-        icon: 'ℹ️',
-      });
+      toast(
+        <span>
+          「{strongMatch.genre}」ですでに「{strongMatch.focus_point}」の視点で似た投稿があります。
+          <br /><br />
+          既存のお題と何が決定的に違うのかを入力してください。
+        </span>, 
+        {
+          icon: 'ℹ️',
+          duration: 6000, // 💡 6000ミリ秒（6秒）表示させて、ゆっくり読ませる
+        }
+      );
       setShowDiffInput(true);
       return;
     }
@@ -305,7 +313,7 @@ export default function Home() {
       setActiveTab('search');
       fetchTopics(0, true);
     } else {
-      alert("投稿エラー: " + error.message);
+      toast.error("投稿エラー: " + error.message);
     }
     setIsSubmittingDraft(false);
   };
@@ -324,7 +332,7 @@ export default function Home() {
       }]);
 
     if (!error) {
-      alert('訂正案が投稿されました！');
+      toast.success('訂正案が投稿されました！');
       setEditingTopicId(null);
       setCorrectionText('');
       fetchTopics(0, true);
@@ -340,10 +348,10 @@ export default function Home() {
       await supabase.from('reports').delete().eq('correction_id', correctionId);
       const { error } = await supabase.from('corrections').delete().eq('id', correctionId);
       if (error) throw error;
-      alert('投稿を削除しました。');
+      toast.success('投稿を削除しました。');
       fetchTopics(0, true);
     } catch (error: any) {
-      alert('削除エラー: ' + error.message);
+      toast.error('削除エラー: ' + error.message);
     } finally {
       setIsSearching(false);
     }
@@ -355,10 +363,10 @@ export default function Home() {
     try {
       const { error } = await supabase.from('topics').delete().eq('id', topicId);
       if (error) throw error;
-      alert('お題を削除しました。');
+      toast.success('お題を削除しました。');
       fetchTopics(0, true);
     } catch (error: any) {
-      alert('削除エラー: ' + error.message);
+      toast.error('削除エラー: ' + error.message);
     } finally {
       setIsSearching(false);
     }
@@ -367,7 +375,7 @@ export default function Home() {
   // 💡 修正：引数に targetUserId と topicId を追加
   const handleLike = async (correctionId: string, targetUserId: string, topicId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('ログインが必要です');
+    if (!user) return toast.error('ログインが必要です');
     const myId = user.id;
 
     // ==========================================
@@ -407,74 +415,14 @@ export default function Home() {
 
     if (dbError) {
       console.error("いいねのDB保存エラー:", dbError);
-      alert(`エラーが発生しました: ${dbError.message}\n（画面を再読み込みします）`);
+      toast.error(`エラーが発生しました: ${dbError.message}\n（画面を再読み込みします）`);
       window.location.reload(); 
-    }
-  };
-
-  const handleReport = async (correctionId: string, targetUserId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('ログインが必要です');
-    if (user.id === targetUserId) return alert('自分の投稿は通報できません');
-    const reason = window.prompt('通報の理由を入力してください');
-    if (!reason) return;
-    
-    const { error } = await supabase.from('reports').insert([{ 
-      reporter_id: user.id, // 💡 最新の user.id を使用
-      target_user_id: targetUserId, 
-      correction_id: correctionId, 
-      reason: reason 
-    }]);
-    if (!error) alert('通報を受理しました。');
-  };
-
-  const handleTimeControl = async (topicId: string, action: 'EXTEND' | 'HASTEN') => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('ログインが必要です');
-    const myId = user.id; // 💡 最新の user.id を使用
-    setTopics(prevTopics => prevTopics.map(topic => {
-      if (topic.id !== topicId) return topic;
-      const controls = topic.topic_time_controls || [];
-      const existing = controls.find((c: any) => c.user_id === myId);
-      let newControls = [...controls];
-      let daysChange = 0;
-      if (existing) {
-        if (existing.action_type === action) {
-          newControls = newControls.filter((c: any) => c.user_id !== myId);
-          daysChange = action === 'EXTEND' ? -7 : 7;
-        } else {
-          newControls = newControls.map((c: any) => c.user_id === myId ? { ...c, action_type: action } : c);
-          daysChange = action === 'EXTEND' ? 14 : -14;
-        }
-      } else {
-        newControls.push({ user_id: myId, action_type: action });
-        daysChange = action === 'EXTEND' ? 7 : -7;
-      }
-      const currentExpires = new Date(topic.expires_at);
-      currentExpires.setDate(currentExpires.getDate() + daysChange);
-      return { ...topic, topic_time_controls: newControls, expires_at: currentExpires.toISOString() };
-    }));
-    const { data: existingControl } = await supabase.from('topic_time_controls').select('*').eq('topic_id', topicId).eq('user_id', myId).maybeSingle();
-    try {
-      if (existingControl) {
-        if (existingControl.action_type === action) {
-          await supabase.from('topic_time_controls').delete().eq('id', existingControl.id);
-        } else {
-          await supabase.from('topic_time_controls').update({ action_type: action }).eq('id', existingControl.id);
-        }
-      } else {
-        await supabase.from('topic_time_controls').insert([{ topic_id: topicId, user_id: myId, action_type: action }]);
-      }
-      fetchTopics(0, true);
-    } catch (err: any) {
-      alert('エラーが発生しました: ' + err.message);
-      fetchTopics(0, true);
     }
   };
 
   const handleGenerateNextGen = async (topicId: string) => {
     const { data: { user } } = await supabase.auth.getUser(); // 💡 セッション確認
-    if (!user) return alert('ログインが必要です');
+    if (!user) return toast.error('ログインが必要です');
     
     // UIを「生成中」に切り替える
     setTopics(prev => prev.map(t => t.id === topicId ? { ...t, is_generating: true } : t));
@@ -495,12 +443,12 @@ export default function Home() {
       }
 
       // 成功時
-      alert(data.message);
+      toast.success(data.message);
       fetchTopics(0, true); 
 
     } catch (error: any) {
       // 💡 修正ポイント: ここでエラー内容を表示
-      alert("更新に失敗しました: " + error.message);
+      toast.error("更新に失敗しました: " + error.message);
       
       // 失敗したら「生成中」の状態を解除する
       setTopics(prev => prev.map(t => t.id === topicId ? { ...t, is_generating: false } : t));
@@ -538,7 +486,7 @@ export default function Home() {
 
   const handleVoteRevival = async (topicId: string) => {
     const { data: { user } } = await supabase.auth.getUser(); // 💡 最新セッション確認
-    if (!user) return alert('復活させるにはログインが必要です');
+    if (!user) return toast.error('復活させるにはログインが必要です');
 
     // 💡 ワンクッション確認を入れる
     const proceed = window.confirm('この探求をLIVEモードに復活させますか？\n（※3日間の寿命から再スタートします）');
@@ -550,12 +498,12 @@ export default function Home() {
   
     if (error) {
       // 💡 DB側で RAISE EXCEPTION したメッセージ（「すでに支持済みです」など）を表示
-      alert(error.message); 
+      toast.error(error.message); 
       return;
     }
   
     // 💡 data.revived は常に true で返ってくる設計にしたので、分岐は不要
-    alert('🎉 探求がLIVEモードに復活しました！');
+    toast.success('🎉 探求がLIVEモードに復活しました！');
     handleToggleMode(false);
   };
 
