@@ -243,7 +243,7 @@ export default function Home() {
           const existingTags = Array.isArray(t.search_tags) ? t.search_tags : [];
           const newTags = Array.isArray(data.search_tags) ? data.search_tags : [];
           const commonCount = existingTags.filter((tag: string) => newTags.includes(tag)).length;
-          return commonCount >= 2;
+          return commonCount >= 4;
         });
         setDuplicateTopics(filtered.slice(0, 3));
       }
